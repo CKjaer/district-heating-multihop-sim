@@ -1,0 +1,17 @@
+{
+    "cSpell.enabled": true,
+    "cSpell.diagnosticLevel": "Hint",
+    "cSpell.languageSettings": [
+        {
+        "languageId": "python",
+        "includeRegExpList": [
+            "comments",
+            "strings"
+            ]
+        }
+    ],
+    "cSpell.words": [
+        "usetex",
+        "whitegrid"
+    ]
+}
