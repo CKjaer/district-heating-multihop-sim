@@ -1,0 +1,4 @@
+# Network configuration
+burial_depth: 1.2  # m
+num_nodes: 3
+spacing: 2.5       # m

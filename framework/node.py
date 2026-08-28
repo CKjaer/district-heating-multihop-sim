@@ -1,5 +1,6 @@
 from position import Position
 
+
 class Node:
     def __init__(self, uid: int, position: Position, is_gateway=False):
         self.uid = uid
