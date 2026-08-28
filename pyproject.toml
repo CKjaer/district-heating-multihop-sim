@@ -1,10 +1,10 @@
 [project]
-name = "pipesense-relay"
+name = "district-heating-multihop-sim"
 version = "0.1.0"
-description = "Add your description here"
+description = "Discrete-event simulation of LoRa multihop scheme for district heating grids"
 readme = "README.md"
 authors = [
-    { name = "CKjaer", email = "ChristianKjaerNielsen@gmail.com" }
+    { name = "CKjaer", email = "christankjaernielsen@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pipesense-relay = "pipesense_relay:main"
+district-heating-multihop-sim-relay = "district-heating-multihop-sim:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
