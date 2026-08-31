@@ -24,5 +24,7 @@ package = false
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
+    "notebook>=7.6.2",
     "ruff>=0.16.4",
 ]
