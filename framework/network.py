@@ -5,7 +5,7 @@ from position import Position
 
 
 class LinearNetwork:
-    """Chain of nodes on a line, equally spaced, gateway at the origin."""
+    """Chain of nodes on a line, equally spaced, gateway at the origin"""
 
     def __init__(self, settings: Settings, env: simpy.Environment):
         if settings.num_nodes < 2:
