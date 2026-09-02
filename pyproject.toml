@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "Discrete-event simulation of LoRa multihop scheme for district heating grids"
 readme = "README.md"
 authors = [
-    { name = "CKjaer", email = "christankjaernielsen@gmail.com" }
+    { name = "Christian Kjærsgaard Nielsen", email = "christankjaernielsen@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "matplotlib>=3.11.1",
     "numpy>=2.4.6",
