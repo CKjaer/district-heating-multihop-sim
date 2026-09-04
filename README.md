@@ -54,4 +54,5 @@ For questions regarding the code or the thesis, please contact:
 
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-
+## Acknowledgements
+This repo was inspired by [DRAMCO/LoRa-multihop-sim](https://github.com/DRAMCO/)

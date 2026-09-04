@@ -1,4 +1,18 @@
-# Network configuration
-burial_depth: -1  # m
-num_nodes: 3
-spacing: 12       # m
+network:
+  burial_depth: -1.0        # m
+  num_nodes: 10
+  spacing: 12.0             # m
+  
+radio:
+  frequency: 868.0e+6        # Hz       
+  tx_power: 4.0            # dBm           
+  tx_gain: 0.0      # dBi     
+  rx_gain: 0.0   # dBi
+  rx_sensitivity: -70 # dBm            
+
+u2u: 
+  ref_dist: 1.0   # m
+  loss_tan: 1.0e-3 
+  rel_permittivity: 3.0
+  rel_permeability: 1.0
+

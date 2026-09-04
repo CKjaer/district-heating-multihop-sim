@@ -1,68 +1,106 @@
-import simpy
-from config_loader import Settings, settings
-from node import Node
-from position import Position
-import networkx as nx
 import itertools
 
-class LinearNetwork:
-    """Chain of nodes on a line, equally spaced, gateway at the origin"""
+import networkx as nx
+from config.loader import load_config
+from config.models import Config
+from node import Node
+from position import Position
+from propagation_models import LogDistance, MaterialAttenuation
 
-    def __init__(self, settings: Settings, env: simpy.Environment):
-        if settings.num_nodes < 2:
+
+class LinearNetwork:
+    """Chain of nodes on a line, equidistant spacing with gateway at the origin"""
+
+    def __init__(self, config: Config):
+        if config.network.num_nodes < 2:
             raise ValueError("Need at least 2 nodes (gateway + one sensor)")
-        if settings.spacing <= 0:
+        if config.network.spacing <= 0:
             raise ValueError("Spacing must be > 0")
 
-        self.settings = settings
-        self.env = env
+        self.config = config
         self.nodes = []
-        self.graph = nx.Graph() 
+        self.graph = nx.Graph()
 
-        # Create nodes instances and attach them to networkx graph 
-        for uid in range(settings.num_nodes):
+        # Calculate the path loss for node-to-node link in the underground pipe
+        self._fspl = LogDistance(config.radio)
+        self._insulation_attenuation = MaterialAttenuation(config.radio, config.u2u)
+        self.u2u_path_loss = self._calculate_u2u_path_loss(config.network.spacing)
+
+        # Create nodes instances and attach them to networkx graph
+        for uid in range(config.network.num_nodes):
             node = Node(
-                    uid=uid,
-                    position=Position(uid * settings.spacing, settings.burial_depth),
-                    is_gateway=(uid == 0),
+                uid=uid,
+                pos=Position(uid * config.network.spacing, config.network.burial_depth),
+                radio=self.config.radio,
+                is_gateway=(uid == 0),
             )
             self.nodes.append(node)
+
             self.graph.add_node(
                 uid,
                 node=node,
                 name=f"{uid:02d}",
                 pos=(node.position.x, node.position.y),
             )
-        
-        #TODO: This is a placeholder for the topology
+
+        # Add edges between nodes within range
         for node1, node2 in itertools.combinations(self.nodes, 2):
-            self.graph.add_edge(
-                node1.uid,
-                node2.uid,
-                weight=node1.position.distance_to(node2.position),
-            )
+            distance = node1.distance_to(node2.position)
+            path_loss = self._calculate_u2u_path_loss(distance)
+            
+            if node1.in_range(path_loss, node2.radio.rx_sensitivity):
+                self.graph.add_edge(
+                    node1.uid,
+                    node2.uid,
+                    weight=distance,
+                )
+
+    def print_adjacency(self):
+        for uid in sorted(self.graph.nodes()):
+            neighbors = sorted(self.graph.neighbors(uid))
+            print(f"Node {uid:02d} -> {neighbors}")
 
     def plot(self):
         import matplotlib.pyplot as plt
+        from matplotlib import patches
+        from matplotlib.collections import PatchCollection
 
         pos = nx.get_node_attributes(self.graph, "pos")
         labels = nx.get_node_attributes(self.graph, "name")
-        options = {"node_size": 1000}
+
         _, ax = plt.subplots()
-        nx.draw(self.graph, pos, labels=labels, with_labels=True, **options)
+        nx.draw_networkx_nodes(self.graph, pos, node_size=1000)
+        nx.draw_networkx_labels(self.graph, pos, labels=labels)
         ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
         ax.axis("on")
+        ax.set_aspect("equal", adjustable="datalim")
+        
+        # Range is the number of connected neighbors and is identical since
+        # the nodes are equidistant in LinearNetwork
+        neighbor_range = self.graph.degree(0) * self.config.network.spacing
+
+        circles = [
+            patches.Circle((n.position.x, n.position.y), neighbor_range)
+            for n in self.nodes
+        ]
+        ax.add_collection(
+            PatchCollection(
+                circles,
+                facecolors="none",
+                edgecolors="black",
+                linestyles="--",
+            )
+        )
+
         plt.show()
 
-    def __str__(self):
-        lines = [f"LinearNetwork: {self.settings.num_nodes} nodes, spacing = {self.settings.spacing} m"]
-        lines.extend(str(node) for node in self.nodes)
-        return "\n".join(lines)
-
+    def _calculate_u2u_path_loss(self, dist):
+        return self._fspl(dist) + self._insulation_attenuation(dist)
+    
 
 if __name__ == "__main__":
-    env = simpy.Environment()
-    network = LinearNetwork(settings, env)
-    print(network)
+    config = load_config()
+    network = LinearNetwork(config)
+    network.print_adjacency()
     network.plot()
     

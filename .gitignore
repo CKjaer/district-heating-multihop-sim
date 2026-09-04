@@ -7,8 +7,7 @@ wheels/
 *.egg-info
 
 # IDE generated files
-.vscode/*
-!.vscode/settings.json
+.vscode/
 .ruff_cache/
 
 # Virtual environments
