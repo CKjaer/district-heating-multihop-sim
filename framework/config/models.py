@@ -20,9 +20,9 @@ class Radio:
 @dataclass
 class UndergroundPropagation:
     ref_dist: float
+    rel_permeability: float
     loss_tan: float
     rel_permittivity: float
-    rel_permeability: float
 
 
 @dataclass

@@ -12,7 +12,8 @@ radio:
 
 u2u: 
   ref_dist: 1.0   # m
-  loss_tan: 1.0e-3 
-  rel_permittivity: 3.0
   rel_permeability: 1.0
-
+  
+  # FR-3718 from General Plastics @1 GHz
+  loss_tan: 0.00218 
+  rel_permittivity: 1.21 
