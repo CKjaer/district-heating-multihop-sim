@@ -15,6 +15,7 @@ class Radio:
     tx_gain: float
     rx_gain: float
     rx_sensitivity: float
+    bandwidth: float
 
 
 @dataclass

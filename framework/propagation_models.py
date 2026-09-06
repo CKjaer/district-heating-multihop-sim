@@ -32,3 +32,13 @@ class MaterialAttenuation:
 
     def __call__(self, dist):
         return self.alpha * dist
+
+class LogShadow:
+    """Calculates the log-normal shadowing path loss in dB"""
+    def __init__(self, log_dist: LogDistance, std=0.0):
+        self.L = log_dist
+        self.sigma = max(0, std)
+
+    def __call__(self, dist):
+        dist = np.asarray(dist)
+        return self.L(dist) + np.random.normalp(0, self.sigma, size=dist.shape)
