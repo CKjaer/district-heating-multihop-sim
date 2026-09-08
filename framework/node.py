@@ -18,6 +18,9 @@ class Node:
         return math.dist(
             (self.position.x, self.position.y), (other.x, other.y)
         )
+
+    def tx():
+        return 0
     
     def __str__(self):
         return f"Node {self.uid} at {self.position}"
