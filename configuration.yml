@@ -1,20 +1,25 @@
 network:
-  burial_depth: -1.0        # m
+  burial_depth: -1.0      # m
   num_nodes: 10
-  spacing: 12.0             # m
-  
-radio:
-  frequency: 868.0e+6        # Hz       
-  tx_power: 7.0            # dBm           
-  tx_gain: 0.0      # dBi     
-  rx_gain: 0.0   # dBi
-  rx_sensitivity: -112 # dBm, For SX1276/77/78/79 devices @500 kHz bandwidth in HF mode     
-  bandwidth: 500.0e+3
+  spacing: 12.0           # m
 
-u2u: 
-  ref_dist: 1.0   # m
+radio:
+  frequency: 868.0e+6     # Hz
+  tx_power: 7.0           # dBm
+  tx_gain: 0.0            # dBi
+  rx_gain: 0.0            # dBi
+  rx_sensitivity: -112    # dBm, For SX1276/77/78/79 devices @500 kHz bandwidth in HF mode
+  bandwidth: 500.0e+3     # Hz
+
+# Config for underground-to-underground link between nodes
+u2u:
+  ref_dist: 1.0           # m
   rel_permeability: 1.0
 
-  # FR-3718 from General Plastics @1 GHz
-  loss_tan: 0.00218 
-  rel_permittivity: 1.21 
+  # FR-3718 insulation from General Plastics @1 GHz
+  loss_tan: 0.00218
+  rel_permittivity: 1.21
+
+# Config for underground node to aboveground gateway link
+u2g:
+  std_shadowing: 6.0      # dB

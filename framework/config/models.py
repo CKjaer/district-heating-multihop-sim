@@ -25,9 +25,13 @@ class UndergroundPropagation:
     loss_tan: float
     rel_permittivity: float
 
+@dataclass
+class Underground2AbovergroundPropagation:
+    std_shadowing: float
 
 @dataclass
 class Config:
     network: NetworkGeometry
     radio: Radio
     u2u: UndergroundPropagation
+    u2g: Underground2AbovergroundPropagation
