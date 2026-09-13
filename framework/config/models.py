@@ -28,6 +28,9 @@ class UndergroundPropagation:
 @dataclass
 class Underground2AbovergroundPropagation:
     std_shadowing: float
+    edge_prob: float
+    coverage: str
+    path_loss_exponent: float
 
 @dataclass
 class Config:

@@ -23,3 +23,6 @@ u2u:
 # Config for underground node to aboveground gateway link
 u2g:
   std_shadowing: 6.0      # dB
+  edge_prob: .80          
+  coverage: "radial"      # Coverage probability "edge" | "radial"
+  path_loss_exponent: 2.0

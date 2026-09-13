@@ -6,10 +6,11 @@ from position import Position
 
 
 class Node:
-    def __init__(self, uid: int, pos: Position, radio: Radio):
+    def __init__(self, uid: int, pos: Position, radio: Radio, coverage: float):
         self.uid = uid
         self.position = pos
         self.radio = radio
+        self.coverage = coverage
 
     def in_range(self, path_loss: float, rx_sensitivity: float) -> bool:
         return (self.radio.tx_power - path_loss) > rx_sensitivity
@@ -18,9 +19,6 @@ class Node:
         return math.dist(
             (self.position.x, self.position.y), (other.x, other.y)
         )
-
-    def tx():
-        return 0
     
     def __str__(self):
         return f"Node {self.uid} at {self.position}"

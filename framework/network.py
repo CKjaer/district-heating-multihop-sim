@@ -1,11 +1,13 @@
 import itertools
 
 import networkx as nx
+import numpy as np
 from config.loader import load_config
 from config.models import Config
 from node import Node
 from position import Position
 from propagation_models import LogDistance, MaterialAttenuation
+from scipy import stats
 
 
 class LinearNetwork:
@@ -26,14 +28,23 @@ class LinearNetwork:
         self._insulation_attenuation = MaterialAttenuation(config.radio, config.u2u)
         self.u2u_path_loss = self._calculate_u2u_path_loss(config.network.spacing)
 
+        # Calculate the log-distance path loss at the coverage radius
+        self._edge_path_loss = stats.norm.isf(config.u2g.edge_prob)
+        self._max_node_dist = config.network.num_nodes * config.network.spacing
+
         # Create nodes instances and attach them to networkx graph
         for uid in range(config.network.num_nodes):
-            node = Node(
-                uid=uid,
-                pos=Position(uid * config.network.spacing, config.network.burial_depth),
-                radio=self.config.radio,
-                is_gateway=(uid == 0),
+            position = Position(
+                uid * config.network.spacing + config.network.spacing,
+                config.network.burial_depth,
             )
+
+            coverage = self._assign_coverage_prob(position.x)
+
+            node = Node(
+                uid=uid, pos=position, radio=self.config.radio, coverage=coverage
+            )
+
             self.nodes.append(node)
 
             self.graph.add_node(
@@ -47,7 +58,7 @@ class LinearNetwork:
         for node1, node2 in itertools.combinations(self.nodes, 2):
             distance = node1.distance_to(node2.position)
             path_loss = self._calculate_u2u_path_loss(distance)
-            
+
             if node1.in_range(path_loss, node2.radio.rx_sensitivity):
                 self.graph.add_edge(
                     node1.uid,
@@ -74,7 +85,7 @@ class LinearNetwork:
         ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
         ax.axis("on")
         ax.set_aspect("equal", adjustable="datalim")
-        
+
         # Range is the number of connected neighbors and is identical since
         # the nodes are equidistant in LinearNetwork
         neighbor_range = self.graph.degree(0) * self.config.network.spacing
@@ -94,13 +105,32 @@ class LinearNetwork:
 
         plt.show()
 
+    def print_coverage(self):
+        for node in self.nodes:
+            print(f"Node {node.uid} coverage probability {node.coverage:.4f}")
+
     def _calculate_u2u_path_loss(self, dist):
         return self._fspl(dist) + self._insulation_attenuation(dist)
-    
+
+    def _assign_coverage_prob(self, x_pos):
+        match self.config.u2g.coverage:
+            case "radial":  # Coverage probability increases with uid
+                loss_diff = (
+                    10
+                    * self.config.u2g.path_loss_exponent
+                    * np.log10(self._max_node_dist / x_pos)
+                )
+                coverage_prob = stats.norm.sf(
+                    self._edge_path_loss - loss_diff / self.config.u2g.std_shadowing
+                )
+                return coverage_prob
+            case "edge":  # Coverage probability is identical for all uid
+                return self.config.u2g.edge_prob
+            case _:
+                raise ValueError("Unknown coverage case:", self.config.u2g.coverage)
+
 
 if __name__ == "__main__":
     config = load_config()
-    network = LinearNetwork(config)
-    network.print_adjacency()
-    network.plot()
-    
+    network = LinearNetwork(config) 
+    network.print_coverage()
