@@ -5,11 +5,12 @@ network:
 
 radio:
   frequency: 868.0e+6     # Hz
-  tx_power: 7.0           # dBm
+  tx_power: -4.0          # dBm
   tx_gain: 0.0            # dBi
   rx_gain: 0.0            # dBi
-  rx_sensitivity: -112    # dBm, For SX1276/77/78/79 devices @500 kHz bandwidth in HF mode
+  rx_sensitivity: -111    # dBm, For SX1276/77/78/79 devices @500 kHz bandwidth in HF mode
   bandwidth: 500.0e+3     # Hz
+  spreading_factor: 6
 
 # Config for underground-to-underground link between nodes
 u2u:
