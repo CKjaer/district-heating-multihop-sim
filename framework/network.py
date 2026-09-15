@@ -131,6 +131,9 @@ class LinearNetwork:
 
 
 if __name__ == "__main__":
-    config = load_config()
+    from pathlib import Path
+
+    _ROOT = Path(__file__).resolve().parents[1]  
+    config = load_config(_ROOT / "configuration.yml")
     network = LinearNetwork(config) 
-    network.print_coverage()
+    print(config.mac.cad_time)

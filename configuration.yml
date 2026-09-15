@@ -27,3 +27,9 @@ u2g:
   edge_prob: .80          
   coverage: "radial"      # Coverage probability "edge" | "radial"
   path_loss_exponent: 2.0
+
+energy:
+  vcc: 3.3                # V
+
+mac:
+  packet_rate: 1.0
