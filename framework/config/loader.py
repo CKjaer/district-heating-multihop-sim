@@ -6,7 +6,7 @@ from dacite import from_dict
 from .models import Config
 
 
-def load_config(path: Path = Path("configuration.yml")) -> Config:
+def load_config(path: Path) -> Config:
     """Load the configuration from yaml file to a Config object"""
     with path.open() as file:
         data = yaml.safe_load(file)
