@@ -1,5 +1,5 @@
 import numpy as np
-from config.models import Radio, UndergroundPropagation
+from config.models import Radio, UndergroundToUnderground
 
 _PERMEABILITY_VACUUM = 1.257e-6 
 _PERMITTIVITY_VACUUM = 8.854e-12
@@ -23,7 +23,7 @@ class LogDistance:
 
 class MaterialAttenuation:
     """Calculates the attenuation in lossy materials from the complex propagation constant in dB"""
-    def __init__(self, radio: Radio, u2u: UndergroundPropagation):
+    def __init__(self, radio: Radio, u2u: UndergroundToUnderground):
         epsilon = _PERMITTIVITY_VACUUM * u2u.rel_permittivity * (1 - 1j * np.tan(u2u.loss_tan))
         mu = _PERMEABILITY_VACUUM * u2u.rel_permeability
         gamma = 1j * 2 * np.pi * radio.frequency * np.sqrt(mu * epsilon)                 

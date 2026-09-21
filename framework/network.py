@@ -7,6 +7,7 @@ from config.models import Config
 from node import Node
 from position import Position
 from propagation_models import LogDistance, MaterialAttenuation
+from coverage import compute_margin_offset, find_cell_edge_margin
 from scipy import stats
 
 
@@ -28,10 +29,10 @@ class LinearNetwork:
         self._insulation_attenuation = MaterialAttenuation(config.radio, config.u2u)
         self.u2u_path_loss = self._calculate_u2u_path_loss(config.network.spacing)
 
-        # Calculate the log-distance path loss at the coverage radius
-        self._edge_path_loss = stats.norm.isf(config.u2g.edge_prob)
-        self._max_node_dist = config.network.num_nodes * config.network.spacing
-
+        # Calculate cell edge link margin for the node coverage probabilities
+        self._cell_margin = find_cell_edge_margin(config.u2g)
+        self._max_radius = (self.config.network.num_nodes + 1) * config.network.spacing
+        
         # Create nodes instances and attach them to networkx graph
         for uid in range(config.network.num_nodes):
             position = Position(
@@ -113,19 +114,12 @@ class LinearNetwork:
         return self._fspl(dist) + self._insulation_attenuation(dist)
 
     def _assign_coverage_prob(self, x_pos):
-        match self.config.u2g.coverage:
+
+        match self.config.u2g.coverage_case:
             case "radial":  # Coverage probability increases with uid
-                loss_diff = (
-                    10
-                    * self.config.u2g.path_loss_exponent
-                    * np.log10(self._max_node_dist / x_pos)
-                )
-                coverage_prob = stats.norm.sf(
-                    self._edge_path_loss - loss_diff / self.config.u2g.std_shadowing
-                )
-                return coverage_prob
+                return compute_margin_offset(self.config.u2g, self._cell_margin, self._max_radius, x_pos)
             case "edge":  # Coverage probability is identical for all uid
-                return self.config.u2g.edge_prob
+                return self._cell_margin
             case _:
                 raise ValueError("Unknown coverage case:", self.config.u2g.coverage)
 

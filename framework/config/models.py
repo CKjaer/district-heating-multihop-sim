@@ -22,7 +22,7 @@ class Radio:
 
 
 @dataclass
-class UndergroundPropagation:
+class UndergroundToUnderground:
     ref_dist: float
     rel_permeability: float
     loss_tan: float
@@ -30,10 +30,10 @@ class UndergroundPropagation:
 
 
 @dataclass
-class Underground2AbovergroundPropagation:
+class UndergroundToAboveground:
     std_shadowing: float
-    edge_prob: float
-    coverage: str
+    cell_coverage_prob: float
+    coverage_case: str
     path_loss_exponent: float
 
 
@@ -116,8 +116,8 @@ class EnergyProfile:
 @dataclass
 class Config:
     network: NetworkGeometry
-    u2u: UndergroundPropagation
-    u2g: Underground2AbovergroundPropagation
+    u2u: UndergroundToUnderground
+    u2g: UndergroundToAboveground
     mac: Mac
     radio: Radio
     energy: EnergyProfile
