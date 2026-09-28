@@ -30,6 +30,12 @@ u2g:
 
 energy:
   vcc: 3.3                # V
+  tcvr:
+    name: "SX1276" # For SF6 and BW=500 kHz
+    sleep_current: 1.0e-6 # A
+    tx_current: 20.0e-3   # A
+    rx_current: 13.8e-3   # A
+    cad_process_current: 13.0e-3 # A
 
 mac:
   packet_rate: 1.0

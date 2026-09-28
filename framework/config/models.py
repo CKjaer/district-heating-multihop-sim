@@ -82,7 +82,7 @@ class Mac:
         return n_payload_sym
 
 
-@dataclass(frozen=True)
+@dataclass
 class Transceiver:
     name: str
     sleep_current: float
@@ -91,20 +91,10 @@ class Transceiver:
     cad_process_current: float
 
 
-# TODO: move this to config instead
-_SX1276 = Transceiver(
-    name="SX1276",
-    sleep_current=1e-6,
-    tx_current=20e-3,
-    rx_current=13.8e-3,
-    cad_process_current=13.0,
-)
-
-
 @dataclass
 class EnergyProfile:
     vcc: float
-    tcvr: Transceiver = _SX1276
+    tcvr: Transceiver
     sleep_power: float = field(init=False)
     tx_power: float = field(init=False)
     rx_power: float = field(init=False)
