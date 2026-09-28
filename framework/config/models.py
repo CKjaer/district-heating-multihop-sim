@@ -50,6 +50,9 @@ class Packet:
 @dataclass
 class Mac:
     packet_rate: float
+    cad_interval: float
+    cad_proc_time: float = field(init=False) 
+    cad_det_time: float = field(init=False)
     cad_time: float = field(init=False)
     _SYNCWORD: ClassVar[float] = 4.25  # symbols
 
@@ -123,8 +126,8 @@ class Config:
     energy: EnergyProfile
 
     def __post_init__(self):
-        cad_time, process_time = self.mac.calculate_cad_timings(
+        d_t, p_t = self.mac.calculate_cad_timings(
             self.radio.spreading_factor, self.radio.bandwidth
         )
-
-        self.mac.cad_time = cad_time + process_time
+        self.mac.cad_det_time = d_t
+        self.mac.cad_proc_time = p_t

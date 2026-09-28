@@ -33,3 +33,4 @@ energy:
 
 mac:
   packet_rate: 1.0
+  cad_interval: 2.0

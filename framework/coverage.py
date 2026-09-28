@@ -1,5 +1,9 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
-from config.models import UndergroundToAboveground
+
+if TYPE_CHECKING:
+    from config.models import UndergroundToAboveground
 from scipy import optimize
 from scipy.stats import norm
 

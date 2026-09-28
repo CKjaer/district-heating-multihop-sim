@@ -1,26 +1,30 @@
 import itertools
 
 import networkx as nx
-import numpy as np
+import simpy as sp
 from config.loader import load_config
 from config.models import Config
+from coverage import find_cell_edge_margin, compute_coverage_prob
 from node import Node
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from node import NodeState
+
 from position import Position
 from propagation_models import LogDistance, MaterialAttenuation
-from coverage import compute_margin_offset, find_cell_edge_margin
-from scipy import stats
-
 
 class LinearNetwork:
     """Chain of nodes on a line, equidistant spacing with gateway at the origin"""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, env: sp.Environment):
         if config.network.num_nodes < 2:
             raise ValueError("Need at least 2 nodes (gateway + one sensor)")
         if config.network.spacing <= 0:
             raise ValueError("Spacing must be > 0")
 
         self.config = config
+        self.env = env
         self.nodes = []
         self.graph = nx.Graph()
 
@@ -42,8 +46,7 @@ class LinearNetwork:
 
             coverage = self._assign_coverage_prob(position.x)
 
-            node = Node(
-                uid=uid, pos=position, radio=self.config.radio, coverage=coverage
+            node = Node(self.env, uid, position, self.config.mac, self.config.energy, self, coverage
             )
 
             self.nodes.append(node)
@@ -57,15 +60,28 @@ class LinearNetwork:
 
         # Add edges between nodes within range
         for node1, node2 in itertools.combinations(self.nodes, 2):
-            distance = node1.distance_to(node2.position)
-            path_loss = self._calculate_u2u_path_loss(distance)
-
-            if node1.in_range(path_loss, node2.radio.rx_sensitivity):
+            is_neighbor = self.is_node_in_range(node1, node2)
+            if is_neighbor:
                 self.graph.add_edge(
                     node1.uid,
                     node2.uid,
-                    weight=distance,
+                    weight=node1.distance_to(node2.position),
                 )
+
+    def is_node_in_range(self, node: Node, other: Node):
+        r = self.config.radio
+        dist = node.distance_to(other.position)
+        path_loss = self._calculate_u2u_path_loss(dist)
+
+        return (r.tx_power - path_loss) > r.rx_sensitivity
+
+    def get_neighbors_in_state(self, node: Node, state: NodeState):
+        return [other 
+                for other in self.nodes 
+                if other is not node
+                and other.state is state
+                and self.is_node_in_range(node, other)]
+
 
     def print_adjacency(self):
         for uid in sorted(self.graph.nodes()):
@@ -117,7 +133,7 @@ class LinearNetwork:
 
         match self.config.u2g.coverage_case:
             case "radial":  # Coverage probability increases with uid
-                return compute_margin_offset(self.config.u2g, self._cell_margin, self._max_radius, x_pos)
+                return compute_coverage_prob(self.config.u2g, self._cell_margin, self._max_radius, x_pos)
             case "edge":  # Coverage probability is identical for all uid
                 return self._cell_margin
             case _:
@@ -129,5 +145,6 @@ if __name__ == "__main__":
 
     _ROOT = Path(__file__).resolve().parents[1]  
     config = load_config(_ROOT / "configuration.yml")
-    network = LinearNetwork(config) 
-    print(config.mac.cad_time)
+    env = sp.Environment()
+    network = LinearNetwork(config, env) 
+    print(config.mac.cad_det_time)

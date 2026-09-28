@@ -3,3 +3,4 @@ def enable_latex_rendering():
     import matplotlib.pyplot as plt
     plt.rcParams['text.usetex'] = True
     plt.rcParams['font.family'] = 'serif'
+    plt.rcParams["font.size"] = 16
