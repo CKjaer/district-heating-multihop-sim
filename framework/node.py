@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from config.models import EnergyProfile, Mac
+from config.models import EnergyProfile, Mac, Packet, Radio
 
 if TYPE_CHECKING:
     from network import LinearNetwork
@@ -41,6 +41,7 @@ class Node:
         uid: int,
         pos: Position,
         mac: Mac,
+        radio: Radio,
         nw: LinearNetwork,
         e: EnergyProfile,
         coverage: float,
@@ -49,6 +50,7 @@ class Node:
         self.uid = uid
         self.position = pos
         self.mac = mac
+        self.radio = radio
         self.network = nw
         self.coverage = coverage
 
@@ -83,8 +85,15 @@ class Node:
     def rx(self):
         self.env.timeout(1.0) # Placeholder
 
-    def tx(self):
-        self.env.timeout(1.0) # Placeholder
+    def tx(self, pkt: Packet):
+        preamb_t, payload_t = self.mac.calculate_packet_toa(pkt, self.radio.spreading_factor, self.radio.bandwidth)
+        self._change_state(NodeState.TX_PREAMBLE)
+        yield self.env.timeout(preamb_t)
+
+        self._change_state(NodeState.TX_PAYLOAD)
+        yield self.env.timeout(payload_t)
+
+        self.state_change(NodeState.SLEEP)
 
     def distance_to(self, other: Position):
         return math.dist((self.position.x, self.position.y), (other.x, other.y))

@@ -51,6 +51,7 @@ class Packet:
 class Mac:
     packet_rate: float
     cad_interval: float
+    n_preamble_sym: int
     cad_proc_time: float = field(init=False) 
     cad_det_time: float = field(init=False)
     cad_time: float = field(init=False)
@@ -70,7 +71,7 @@ class Mac:
         n_preamble_sym = pkt.n_preamble + self._SYNCWORD
         n_payload_sym = self._n_payload_sym(pkt, sf)
 
-        return (n_payload_sym + n_preamble_sym) * t_sym
+        return (n_payload_sym * t_sym, n_preamble_sym * t_sym)
 
     def _n_payload_sym(self, pkt: Packet, sf: int):
         n_bytes = len(pkt.payload)

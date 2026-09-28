@@ -33,4 +33,5 @@ energy:
 
 mac:
   packet_rate: 1.0
-  cad_interval: 2.0
+  cad_interval: 2.0       # s
+  n_preamble_sym: 8       # LoRa symbols (without syncword)
