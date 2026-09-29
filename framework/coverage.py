@@ -39,4 +39,4 @@ def compute_coverage_prob(
         10 * u2g.path_loss_exponent * np.log10(max_radius / node_radius)
     ) / u2g.std_shadowing
 
-    return edge_margin - offset
+    return norm.sf(edge_margin - offset)
