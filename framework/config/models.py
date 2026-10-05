@@ -52,10 +52,10 @@ class Mac:
     packet_rate: float
     cad_interval: float
     n_preamble_sym: int
-    cad_proc_time: float = field(init=False) 
-    cad_det_time: float = field(init=False)
-    cad_time: float = field(init=False)
-    _SYNCWORD: ClassVar[float] = 4.25  # symbols
+    cad_proc_time: float = field(init=False)  
+    cad_det_time: float = field(init=False) 
+    cad_time: float = field(init=False) 
+    _SYNCWORD: ClassVar[float] = 4.25 
 
     def calculate_cad_timings(self, sf: int, bw: float):
         """Compute the CAD and processing times in seconds"""
@@ -92,12 +92,24 @@ class Transceiver:
 
 
 @dataclass
+class EnergyBuffer:
+    capacitance: float  
+    v_max: float  
+    v_min: float  
+    capacity: float = field(init=False)  
+
+    def __post_init__(self):
+        self.capacity = 0.5 * self.capacitance * (self.v_max**2 - self.v_min**2)
+
+@dataclass
 class EnergyProfile:
     vcc: float
+    harvest_power: float  
     tcvr: Transceiver
+    buffer: EnergyBuffer
     sleep_power: float = field(init=False)
     tx_power: float = field(init=False)
-    rx_power: float = field(init=False)
+    rx_power: float = field(init=False)   
     cad_process_power: float = field(init=False)
 
     def __post_init__(self):
