@@ -43,7 +43,6 @@ energy:
     v_min: 3.5            # V, regulator cut-off
 
 mac:
-  packet_rate: 1.0
   cad_interval: 2.0       # s
   n_preamble_sym: 8       # LoRa symbols (without syncword)
   max_start_delay: 10.0   # s

@@ -1,19 +1,18 @@
 import itertools
+from typing import TYPE_CHECKING
 
 import networkx as nx
 import simpy as sp
-from config.loader import load_config
-from config.models import Config
-from coverage import find_cell_edge_margin, compute_coverage_prob
-from node import Node
 
-from typing import TYPE_CHECKING
+from .config.models import Config
+from .coverage import compute_coverage_prob, find_cell_edge_margin
+from .node import Node
 
 if TYPE_CHECKING:
     from node import NodeState
 
-from position import Position
-from propagation_models import LogDistance, MaterialAttenuation
+from .position import Position
+from .propagation_models import LogDistance, MaterialAttenuation
 
 
 class LinearNetwork:
@@ -42,6 +41,9 @@ class LinearNetwork:
             self._create_node(uid) for uid in range(self.config.network.num_nodes)
         ]
         self._connect_graph_edges(self.nodes)
+    
+    def run(self):
+        print("Running network...")
 
     def is_node_in_range(self, node: Node, other: Node):
         r = self.config.radio
@@ -111,14 +113,14 @@ class LinearNetwork:
         coverage = self._assign_coverage_prob(position.x)
 
         node = Node(
-            self.env,
-            uid,
-            position,
-            self.config.mac,
-            self.config.radio,
-            self.config.energy,
-            self,
-            coverage,
+            env=self.env,
+            uid=uid,
+            pos=position,
+            mac=self.config.mac,
+            radio=self.config.radio,
+            nw=self,
+            e=self.config.energy,
+            coverage=coverage,
         )
 
         self.graph.add_node(
@@ -153,13 +155,3 @@ class LinearNetwork:
                 return self._cell_margin
             case _:
                 raise ValueError("Unknown coverage case:", self.config.u2g.coverage)
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    _ROOT = Path(__file__).resolve().parents[1]
-    config = load_config(_ROOT / "configuration.yml")
-    env = sp.Environment()
-    network = LinearNetwork(config, env)
-    print(config.mac.cad_det_time)

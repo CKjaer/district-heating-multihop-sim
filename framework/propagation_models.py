@@ -1,5 +1,5 @@
 import numpy as np
-from config.models import Radio, UndergroundToUnderground
+from .config.models import Radio, UndergroundToUnderground
 
 _PERMEABILITY_VACUUM = 1.257e-6 
 _PERMITTIVITY_VACUUM = 8.854e-12

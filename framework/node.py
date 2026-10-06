@@ -2,11 +2,11 @@ import math
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from config.models import EnergyProfile, Mac, Packet, Radio
-from position import Position
+from .config.models import EnergyProfile, Mac, Packet, Radio
+from .position import Position
 
 if TYPE_CHECKING:
-    from network import LinearNetwork
+    from .network import LinearNetwork
 from enum import Enum, auto
 
 import simpy as sp
@@ -43,7 +43,7 @@ class Node:
         self.coverage = coverage
         self.energy = e
 
-        self.buffer = e.buffer.capacity  # J
+        self.buffer = self.energy.buffer.capacity  # J
         self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
         self.state = NodeState.SLEEP
         self._last_change_time = 0.0  # s
