@@ -120,12 +120,12 @@ class Node:
         match state:
             case NodeState.SLEEP:
                 return self.energy.sleep_power
-            case NodeState.CAD_DETECT:
-                return self.energy.cad_process_power
             case NodeState.TX_PAYLOAD | NodeState.TX_PREAMBLE:
                 return self.energy.tx_power
-            case NodeState.RX | NodeState.CAD_PROCESSING:
+            case NodeState.RX | NodeState.CAD_DETECT:
                 return self.energy.rx_power
+            case NodeState.CAD_PROCESSING:
+                return self.energy.cad_process_power
 
     def __str__(self):
         return f"Node {self.uid} at {self.position}"

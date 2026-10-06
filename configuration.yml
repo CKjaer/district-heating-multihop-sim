@@ -36,7 +36,7 @@ energy:
     sleep_current: 1.0e-6 # A
     tx_current: 20.0e-3   # A
     rx_current: 13.8e-3   # A
-    cad_process_current: 13.0e-3 # A
+    cad_process_current: 8.3e-3 # A
   buffer:
     capacitance: 1.0      # F
     v_max: 5.3            # V
