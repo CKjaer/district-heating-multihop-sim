@@ -3,14 +3,14 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from config.models import EnergyProfile, Mac, Packet, Radio
+from position import Position
 
 if TYPE_CHECKING:
     from network import LinearNetwork
-
 from enum import Enum, auto
 
 import simpy as sp
-from position import Position
+from numpy import random
 
 
 class NodeState(Enum):
@@ -47,9 +47,14 @@ class Node:
         self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
         self.state = NodeState.SLEEP
         self._last_change_time = 0.0  # s
+        self._is_init = True
 
     def wakeup(self):
         while True:
+            if self._is_init:
+                yield self.env.timeout(random.uniform(0.0, self.mac.max_start_delay))
+                self._is_init = False
+            
             self._change_state(NodeState.SLEEP)
             yield self.env.timeout(self.mac.cad_interval)
 

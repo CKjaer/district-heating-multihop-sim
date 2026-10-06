@@ -52,6 +52,7 @@ class Mac:
     packet_rate: float
     cad_interval: float
     n_preamble_sym: int
+    max_start_delay: float
     cad_proc_time: float = field(init=False)  
     cad_det_time: float = field(init=False) 
     cad_time: float = field(init=False) 
