@@ -33,7 +33,7 @@ energy:
   harvest_power: 0.55e-3  # W
   tcvr:
     name: "SX1276" # Current consumption for SF6 and BW=500 kHz
-    sleep_current: 1.0e-6 # A
+    sleep_current: 0.2e-6 # A
     tx_current: 20.0e-3   # A
     rx_current: 13.8e-3   # A
     cad_process_current: 8.3e-3 # A
