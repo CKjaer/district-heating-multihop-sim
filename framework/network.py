@@ -9,7 +9,7 @@ from .coverage import compute_coverage_prob, find_cell_edge_margin
 from .node import Node
 
 if TYPE_CHECKING:
-    from node import NodeState
+    from .node import NodeState
 
 from .position import Position
 from .propagation_models import LogDistance, MaterialAttenuation
@@ -44,22 +44,17 @@ class LinearNetwork:
     
     def run(self):
         print("Running network...")
+        for node in self.nodes:
+            self.env.process(node.run())
 
-    def is_node_in_range(self, node: Node, other: Node):
-        r = self.config.radio
+    def rss(self, node: Node, other: Node):
         dist = node.distance_to(other.position)
         path_loss = self._calculate_u2u_path_loss(dist)
+        
+        return self.config.radio.tx_power - path_loss
 
-        return (r.tx_power - path_loss) > r.rx_sensitivity
-
-    def get_neighbors_in_state(self, node: Node, state: NodeState):
-        return [
-            other
-            for other in self.nodes
-            if other is not node
-            and other.state is state
-            and self.is_node_in_range(node, other)
-        ]
+    def is_node_in_range(self, node: Node, other: Node):
+        return self.rss(node, other) > self.config.radio.rx_sensitivity
 
     def print_adjacency(self):
         for uid in sorted(self.graph.nodes()):
@@ -99,10 +94,6 @@ class LinearNetwork:
         )
 
         plt.show()
-
-    def print_coverage(self):
-        for node in self.nodes:
-            print(f"Node {node.uid} coverage probability {node.coverage:.4f}")
 
     def _create_node(self, uid: int) -> Node:
         position = Position(

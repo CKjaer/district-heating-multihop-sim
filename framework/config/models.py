@@ -19,6 +19,12 @@ class Radio:
     rx_sensitivity: float
     bandwidth: float
     spreading_factor: int
+    sym_time: float = field(init=False)
+    CAPTURE_THRESHOLD: ClassVar[float] = 6.0 # dB
+    N_SYNC_SYM: ClassVar[int] = 4 # symbols
+    
+    def __post_init__(self):
+        self.sym_time = (2**self.spreading_factor) / self.bandwidth
 
 
 @dataclass
@@ -54,7 +60,7 @@ class Mac:
     max_start_delay: float
     cad_det_time: float = field(init=False) 
     cad_proc_time: float = field(init=False)  
-    _SYNCWORD: ClassVar[float] = 4.25 
+    _SYNCWORD: ClassVar[float] = 4.25 # LoRa symbols
 
     def calculate_cad_timings(self, sf: int, bw: float):
         """Compute the CAD and processing times in seconds"""
@@ -64,13 +70,11 @@ class Mac:
 
         return t_cad, t_processing
 
-    def calculate_packet_toa(self, pkt: Packet, sf: int, bw: float):
-        t_sym = (2**sf) / bw
-
+    def calculate_packet_toa(self, pkt: Packet, sf: int, t_sym: float):
         n_preamble_sym = pkt.n_preamble + self._SYNCWORD
         n_payload_sym = self._n_payload_sym(pkt, sf)
 
-        return (n_payload_sym * t_sym, n_preamble_sym * t_sym)
+        return (n_preamble_sym * t_sym, n_payload_sym * t_sym)
 
     def _n_payload_sym(self, pkt: Packet, sf: int):
         n_bytes = len(pkt.payload)

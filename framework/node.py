@@ -21,6 +21,7 @@ class NodeState(Enum):
     TX_PREAMBLE = auto()
     RX = auto()
 
+TX_STATES = frozenset({NodeState.TX_PREAMBLE, NodeState.TX_PAYLOAD})
 
 class Node:
     def __init__(
@@ -46,44 +47,88 @@ class Node:
         self.buffer = self.energy.buffer.capacity  # J
         self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
         self.state = NodeState.SLEEP
-        self._last_change_time = 0.0  # s
-        self._is_init = True
+        self._radio_state_changed = self.env.event()
+        self._last_change_time = 0.0
 
-    def wakeup(self):
-        while True:
-            if self._is_init:
-                yield self.env.timeout(random.uniform(0.0, self.mac.max_start_delay))
-                self._is_init = False
-            
+        self.collisions = []
+        self.received = []
+        self.preamb_end = 0.0
+        
+    def distance_to(self, other: Position):
+        return math.dist((self.position.x, self.position.y), (other.x, other.y))
+
+    def run(self):
+        yield self.env.timeout(random.uniform(0.0, self.mac.max_start_delay))        
+        yield from self._periodic_wakeup()
+
+    def _periodic_wakeup(self):
+        while True:            
             self._change_state(NodeState.SLEEP)
             yield self.env.timeout(self.mac.cad_interval)
 
-            is_neighbors_active = yield from self.cad()
-            if is_neighbors_active:
-                yield from self.rx()
+            self._change_state(NodeState.CAD_DETECT)
+            yield self.env.timeout(self.mac.cad_det_time)
+            
+            preambles = [
+                n for n in self.network.nodes
+                if n in NodeState.TX_PREAMBLE
+                and n is not self 
+                and self.network.is_node_in_range(self, n)
+            ] 
+            
+            if any(preambles):
+                self._change_state(NodeState.CAD_PROCESSING)
+                yield self.env.timeout(self.mac.cad_proc_time)
+                yield from self._rx()
             else:
-                yield from self.tx()
+                pass # TODO: Check for sensing cycle before tx
 
-    def cad(self):
-        self._change_state(NodeState.CAD_DETECT)
-        yield self.env.timeout(self.mac.cad_det_time)
+    def _rx(self):
+        """Listen to in-range transmissions, return the node whose frame was received or None"""
+        self._change_state(NodeState.RX)
+        sync_time = self.radio.sym_time * self.radio.N_SYNC_SYM
+        locked: Node | None = None
+        neighbors = [
+            n for n in self.network.nodes
+            if n is not self and self.network.is_node_in_range(self, n)
+        ]
+        while True:
+            active = [n for n in neighbors if n.state in TX_STATES]
+            
+            # Locked sender finished its frame without being disrupted
+            if locked is not None and locked not in active:
+                self.received.append((self.env.now, locked.uid))
+                return locked
 
-        neighbors_detected = self.network.get_neighbors_in_state(
-            self, NodeState.TX_PREAMBLE
-        )
-        if any(neighbors_detected):
-            yield self._change_state(NodeState.CAD_PROCESSING)
-            yield self.env.timeout(self.mac.cad_proc_time)
+            # No nodes are transmitting
+            if not active: 
+                return None
+            
+            # Resolve overlapping transmissions accounting for the capture effect
+            strongest = self._resolve_capture(active)
+            is_collided = strongest is None
+            is_lock_lost = locked is not None and strongest is not locked
+            if is_collided or is_lock_lost:
+                self.collisions.append(self.env.now)
+                return None
+                       
+            # Check whether enough preamble is left to sync to candidate
+            if locked is None:
+                remaining_preamb_t = strongest.preamb_end - self.env.now
+                if (
+                    strongest.state is not NodeState.TX_PREAMBLE
+                    or remaining_preamb_t < sync_time 
+                ):
+                    return None
+                locked = strongest
 
-        return neighbors_detected
+            yield self.env.any_of([n._radio_state_changed for n in neighbors])
 
-    def rx(self):
-        self.env.timeout(1.0)  # Placeholder
-
-    def tx(self, pkt: Packet):
+    def _tx(self, pkt: Packet):
         preamb_t, payload_t = self.mac.calculate_packet_toa(
-            pkt, self.radio.spreading_factor, self.radio.bandwidth
+            pkt, self.radio.spreading_factor, self.radio.sym_time
         )
+        self.preamb_end = self.env.now + preamb_t
         self._change_state(NodeState.TX_PREAMBLE)
         yield self.env.timeout(preamb_t)
 
@@ -92,17 +137,38 @@ class Node:
 
         self._change_state(NodeState.SLEEP)
 
-    def distance_to(self, other: Position):
-        return math.dist((self.position.x, self.position.y), (other.x, other.y))
+    def _resolve_capture(self, active: list[Node]):
+        """Return the node that survives interference using the capture effect, or None on a collision"""
+        if len(active) == 1:
+            return active[0]
+        
+        rx_powers = sorted(
+            ((n, self.network.rss(n, self)) for n in active),
+            key=lambda p: p[1],
+            reverse=True,
+            )
+        
+        (node1, p1), (_, p2) = rx_powers[:2]
+
+        if p1 >= p2 + self.radio.CAPTURE_THRESHOLD:
+            return node1
+        return None
 
     def _change_state(self, to_state: NodeState):
         if to_state is self.state:
             return
 
-        dt = self.env.now - self._last_change_time
-        if dt <= 0:
-            return
+        from_state = self.state
+        self._track_spend_energy(from_state)
+        self.state = to_state
+        self._last_change_time = self.env.now
 
+        if from_state in TX_STATES or to_state in TX_STATES:
+            previous_event, self._radio_state_changed = self._radio_state_changed, self.env.event()
+            previous_event.succeed(to_state)       
+
+    def _track_spend_energy(self, to_state: NodeState):
+        dt = self.env.now - self._last_change_time
         self.buffer = min(
             self.energy.buffer.capacity,
             max(
@@ -111,11 +177,8 @@ class Node:
                 + dt * (self.energy.harvest_power - self._state_power(self.state)),
             ),
         )
-
-        self.time_spent_in[self.state] += dt
-        self.state = to_state
-        self._last_change_time = self.env.now
-
+        self.time_spent_in[to_state] += dt
+        
     def _state_power(self, state: NodeState):
         match state:
             case NodeState.SLEEP:
