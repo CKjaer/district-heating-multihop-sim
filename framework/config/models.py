@@ -50,7 +50,7 @@ class Packet:
     code_rate: int = 1
     implicit_header: int = 0
     data_rate_optimize: int = 0
-    n_preamble: int = 8
+    n_preamble_sym: int = 8
 
 
 @dataclass
@@ -71,7 +71,7 @@ class Mac:
         return t_cad, t_processing
 
     def calculate_packet_toa(self, pkt: Packet, sf: int, t_sym: float):
-        n_preamble_sym = pkt.n_preamble + self._SYNCWORD
+        n_preamble_sym = pkt.n_preamble_sym + self._SYNCWORD
         n_payload_sym = self._n_payload_sym(pkt, sf)
 
         return (n_preamble_sym * t_sym, n_payload_sym * t_sym)

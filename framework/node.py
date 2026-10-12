@@ -7,11 +7,16 @@ from .position import Position
 
 if TYPE_CHECKING:
     from .network import LinearNetwork
+from dataclasses import dataclass
 from enum import Enum, auto
 
 import simpy as sp
 from numpy import random
 
+
+@dataclass
+class AnycastPacket(Packet):
+    pass
 
 class NodeState(Enum):
     SLEEP = auto()
@@ -81,7 +86,10 @@ class Node:
                 yield self.env.timeout(self.mac.cad_proc_time)
                 yield from self._rx()
             else:
-                pass # TODO: Check for sensing cycle before tx
+                while True:
+                    yield self.env.timeout(self.mac.measure_interval)
+                    pkt = AnycastPacket(n_preamble_sym=self.mac.n_preamble_sym)
+                    yield from self._tx(pkt)
 
     def _rx(self):
         """Listen to in-range transmissions, return the node whose frame was received or None"""
