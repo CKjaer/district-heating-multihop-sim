@@ -48,7 +48,7 @@ class Packet:
     payload: bytes = bytes(1)
     crc: int = 0
     code_rate: int = 1
-    implicit_header: int = 0
+    implicit_header: int = 1
     data_rate_optimize: int = 0
     n_preamble_sym: int = 8
 
@@ -58,11 +58,13 @@ class Mac:
     cad_interval: float
     n_preamble_sym: int
     max_start_delay: float
+    measure_interval: float
     cad_det_time: float = field(init=False) 
     cad_proc_time: float = field(init=False)  
     _SYNCWORD: ClassVar[float] = 4.25 # LoRa symbols
 
-    def calculate_cad_timings(self, sf: int, bw: float):
+    @staticmethod
+    def calculate_cad_timings(sf: int, bw: float):
         """Compute the CAD and processing times in seconds"""
         chips = 2**sf
         t_cad = (chips + 32) / bw
@@ -76,7 +78,8 @@ class Mac:
 
         return (n_preamble_sym * t_sym, n_payload_sym * t_sym)
 
-    def _n_payload_sym(self, pkt: Packet, sf: int):
+    @staticmethod
+    def n_payload_sym(pkt: Packet, sf: int):
         n_bytes = len(pkt.payload)
         nom = 8.0 * n_bytes - 4.0 * sf + 28 + 16 * pkt.crc - 20 * pkt.implicit_header
         denom = 4.0 * (sf - 2 * pkt.data_rate_optimize)
