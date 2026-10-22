@@ -74,7 +74,7 @@ class Mac:
 
     def calculate_packet_toa(self, pkt: Packet, sf: int, t_sym: float):
         n_preamble_sym = pkt.n_preamble_sym + self._SYNCWORD
-        n_payload_sym = self._n_payload_sym(pkt, sf)
+        n_payload_sym = self.n_payload_sym(pkt, sf)
 
         return (n_preamble_sym * t_sym, n_payload_sym * t_sym)
 

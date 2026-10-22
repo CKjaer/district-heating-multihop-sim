@@ -1,5 +1,6 @@
 import math
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .config.models import EnergyProfile, Mac, Packet, Radio
@@ -7,7 +8,6 @@ from .position import Position
 
 if TYPE_CHECKING:
     from .network import LinearNetwork
-from dataclasses import dataclass
 from enum import Enum, auto
 
 import simpy as sp
@@ -15,16 +15,34 @@ from numpy import random
 
 
 @dataclass
-class AnycastPacket(Packet):
+class BmacPacket(Packet):
     pass
 
+@dataclass(frozen=True, slots=True)
+class StateChange:
+    t: float
+    from_state: NodeState
+    to_state: NodeState
+    buffer: float
+
+    def __str__(self):
+        return (
+            f"{self.t:10.6f} s | "
+            f"{self.from_state:14} -> {self.to_state:14} | "
+            f"{self.buffer:12.9f} J"
+            )
+
 class NodeState(Enum):
+    INIT = auto()
     SLEEP = auto()
     CAD_DETECT = auto()
     CAD_PROCESSING = auto()
     TX_PAYLOAD = auto()
     TX_PREAMBLE = auto()
     RX = auto()
+
+    def __str__(self):
+        return self.name
 
 TX_STATES = frozenset({NodeState.TX_PREAMBLE, NodeState.TX_PAYLOAD})
 
@@ -50,46 +68,63 @@ class Node:
         self.energy = e
 
         self.buffer = self.energy.buffer.capacity  # J
-        self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
-        self.state = NodeState.SLEEP
+        self.state = NodeState.INIT
         self._radio_state_changed = self.env.event()
         self._last_change_time = 0.0
+        self.preamb_end = 0.0
+        self._next_measurement = 0.0
 
+        # Statistics
+        self.record_history = True
+        self.history: list[StateChange] = []
+        self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
         self.collisions = []
         self.received = []
-        self.preamb_end = 0.0
-        
+    
+    def __str__(self):
+        return f"Node {self.uid} at {self.position}"
+
+    def print_history(self):
+        print(f"State history ({len(self.history)} events)")
+        print("-" * 40)
+
+        for event in self.history:
+            print(event)
+
     def distance_to(self, other: Position):
         return math.dist((self.position.x, self.position.y), (other.x, other.y))
 
     def run(self):
-        yield self.env.timeout(random.uniform(0.0, self.mac.max_start_delay))        
+        yield self.env.timeout(random.uniform(0.0, self.mac.max_start_delay))
+        self._change_state(NodeState.SLEEP)
+        self._next_measurement = self.env.now + self.mac.measure_interval
         yield from self._periodic_wakeup()
 
     def _periodic_wakeup(self):
         while True:            
-            self._change_state(NodeState.SLEEP)
             yield self.env.timeout(self.mac.cad_interval)
 
             self._change_state(NodeState.CAD_DETECT)
             yield self.env.timeout(self.mac.cad_det_time)
             
+            self._change_state(NodeState.CAD_PROCESSING)
+            yield self.env.timeout(self.mac.cad_proc_time)
+            
             preambles = [
                 n for n in self.network.nodes
-                if n in NodeState.TX_PREAMBLE
+                if n.state is NodeState.TX_PREAMBLE
                 and n is not self 
                 and self.network.is_node_in_range(self, n)
             ] 
             
-            if any(preambles):
-                self._change_state(NodeState.CAD_PROCESSING)
-                yield self.env.timeout(self.mac.cad_proc_time)
+            if preambles:
                 yield from self._rx()
-            else:
-                while True:
-                    yield self.env.timeout(self.mac.measure_interval)
-                    pkt = AnycastPacket(n_preamble_sym=self.mac.n_preamble_sym)
-                    yield from self._tx(pkt)
+            elif self.env.now >= self._next_measurement:
+                pkt = BmacPacket(n_preamble_sym=self.mac.n_preamble_sym)
+                yield from self._tx(pkt)
+                self._next_measurement = self.env.now + self.mac.measure_interval
+
+            self._change_state(NodeState.SLEEP)
 
     def _rx(self):
         """Listen to in-range transmissions, return the node whose frame was received or None"""
@@ -143,8 +178,6 @@ class Node:
         self._change_state(NodeState.TX_PAYLOAD)
         yield self.env.timeout(payload_t)
 
-        self._change_state(NodeState.SLEEP)
-
     def _resolve_capture(self, active: list[Node]):
         """Return the node that survives interference using the capture effect, or None on a collision"""
         if len(active) == 1:
@@ -167,13 +200,25 @@ class Node:
             return
 
         from_state = self.state
-        self._track_spend_energy(from_state)
+        if from_state is not NodeState.INIT:  # Not started yet, nothing to account
+            self._track_spend_energy(from_state)
+        
+        if self.record_history:
+            self.history.append(StateChange(self.env.now, from_state, to_state, self.buffer))
+        
         self.state = to_state
         self._last_change_time = self.env.now
 
         if from_state in TX_STATES or to_state in TX_STATES:
             previous_event, self._radio_state_changed = self._radio_state_changed, self.env.event()
             previous_event.succeed(to_state)       
+
+    def finalize(self):
+        """Flush the time/energy of the current state up to env.now"""
+        if self.state is NodeState.INIT:  # Never started before the simulation ended
+            return
+        self._track_spend_energy(self.state)
+        self._last_change_time = self.env.now
 
     def _track_spend_energy(self, to_state: NodeState):
         dt = self.env.now - self._last_change_time
@@ -197,6 +242,3 @@ class Node:
                 return self.energy.rx_power
             case NodeState.CAD_PROCESSING:
                 return self.energy.cad_process_power
-
-    def __str__(self):
-        return f"Node {self.uid} at {self.position}"

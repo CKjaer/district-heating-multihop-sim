@@ -15,7 +15,9 @@ def main():
     for n in network.nodes:
         print(f"Node {n.uid} with coverage probability {n.coverage:.2f}")
     
-    network.run()
+    network.run(until=100.0)
+    for node in network.nodes:
+        node.print_history()
 
 if __name__ == "__main__":
     main()

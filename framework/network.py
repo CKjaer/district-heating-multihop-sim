@@ -1,5 +1,4 @@
 import itertools
-from typing import TYPE_CHECKING
 
 import networkx as nx
 import simpy as sp
@@ -7,20 +6,16 @@ import simpy as sp
 from .config.models import Config
 from .coverage import compute_coverage_prob, find_cell_edge_margin
 from .node import Node
-
-if TYPE_CHECKING:
-    from .node import NodeState
-
 from .position import Position
 from .propagation_models import LogDistance, MaterialAttenuation
 
 
 class LinearNetwork:
-    """Chain of nodes on a line, equidistant spacing with gateway at the origin"""
+    """Chain of nodes on a line with equidistant spacing"""
 
     def __init__(self, config: Config, env: sp.Environment):
-        if config.network.num_nodes < 2:
-            raise ValueError("Need at least 2 nodes (gateway + one sensor)")
+        if config.network.num_nodes < 1:
+            raise ValueError("No nodes in the network")
         if config.network.spacing <= 0:
             raise ValueError("Spacing must be > 0")
 
@@ -42,10 +37,15 @@ class LinearNetwork:
         ]
         self._connect_graph_edges(self.nodes)
     
-    def run(self):
+    def run(self, until: float):
         print("Running network...")
         for node in self.nodes:
             self.env.process(node.run())
+
+        self.env.run(until=until)
+
+        for node in self.nodes:
+            node.finalize()
 
     def rss(self, node: Node, other: Node):
         dist = node.distance_to(other.position)
