@@ -1,22 +1,34 @@
 import math
+import random
+import struct
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum, auto
 from typing import TYPE_CHECKING
+
+import simpy as sp
 
 from .config.models import EnergyProfile, Mac, Packet, Radio
 from .position import Position
 
 if TYPE_CHECKING:
     from .network import LinearNetwork
-from enum import Enum, auto
 
-import simpy as sp
-from numpy import random
+@dataclass(slots=True, frozen=True)
+class PipesensePayload:
+    src_uid: int    # uint16
+    seq: int        # uint16
+    link_var: float # float16
+    _FORMAT = struct.Struct("<HHe") # Packs attributes into denoted sizes in little endian
 
+    def __bytes__(self):
+        return self._FORMAT.pack(self.src_uid, self.seq, self.link_var)
 
-@dataclass
-class BmacPacket(Packet):
-    pass
+    @classmethod 
+    def from_bytes(cls, data: bytes):
+        src, id, var = cls._FORMAT.unpack(data)
+        return cls(src, id, var)
+
 
 @dataclass(frozen=True, slots=True)
 class StateChange:
@@ -67,12 +79,16 @@ class Node:
         self.coverage = coverage
         self.energy = e
 
-        self.buffer = self.energy.buffer.capacity  # J
+        self.buffer = self.energy.buffer  
         self.state = NodeState.INIT
         self._radio_state_changed = self.env.event()
         self._last_change_time = 0.0
-        self.preamb_end = 0.0
+        self._preamb_end = 0.0
         self._next_measurement = 0.0
+        
+        self._msg_seq = 0
+        self._pkt_in_tx: Packet | None = None
+        self._pkt_seen = []
 
         # Statistics
         self.record_history = True
@@ -120,8 +136,10 @@ class Node:
             if preambles:
                 yield from self._rx()
             elif self.env.now >= self._next_measurement:
-                pkt = BmacPacket(n_preamble_sym=self.mac.n_preamble_sym)
+                payload = PipesensePayload(src_uid=self.uid, seq=self._msg_seq, link_var=1.0)
+                pkt = Packet(n_preamble_sym=self.mac.n_preamble_sym, payload=bytes(payload))
                 yield from self._tx(pkt)
+                self._msg_seq += 1
                 self._next_measurement = self.env.now + self.mac.measure_interval
 
             self._change_state(NodeState.SLEEP)
@@ -131,6 +149,7 @@ class Node:
         self._change_state(NodeState.RX)
         sync_time = self.radio.sym_time * self.radio.N_SYNC_SYM
         locked: Node | None = None
+        locked_pkt: Packet | None = None
         neighbors = [
             n for n in self.network.nodes
             if n is not self and self.network.is_node_in_range(self, n)
@@ -140,8 +159,9 @@ class Node:
             
             # Locked sender finished its frame without being disrupted
             if locked is not None and locked not in active:
-                self.received.append((self.env.now, locked.uid))
-                return locked
+                if self.handle_rx(locked, locked_pkt):
+                    return locked
+                return None
 
             # No nodes are transmitting
             if not active: 
@@ -157,26 +177,42 @@ class Node:
                        
             # Check whether enough preamble is left to sync to candidate
             if locked is None:
-                remaining_preamb_t = strongest.preamb_end - self.env.now
+                remaining_preamb_t = strongest._preamb_end - self.env.now
                 if (
                     strongest.state is not NodeState.TX_PREAMBLE
                     or remaining_preamb_t < sync_time 
                 ):
                     return None
                 locked = strongest
+                locked_pkt = strongest._pkt_in_tx
 
             yield self.env.any_of([n._radio_state_changed for n in neighbors])
+
+    def handle_rx(self, sender: Node, pkt: Packet | None) -> bool:
+        """Accept a captured frame unless its payload id was seen before."""
+        if pkt is None:
+            return False
+        
+        payload = PipesensePayload.from_bytes(pkt.payload)
+        if (payload.src_uid, payload.seq)  in self._pkt_seen:
+            return False
+
+        self._pkt_seen.append((payload.src_uid, payload.seq))
+        self.received.append((self.env.now, sender.uid))
+        return True
 
     def _tx(self, pkt: Packet):
         preamb_t, payload_t = self.mac.calculate_packet_toa(
             pkt, self.radio.spreading_factor, self.radio.sym_time
         )
-        self.preamb_end = self.env.now + preamb_t
+        self._pkt_in_tx = pkt
+        self._preamb_end = self.env.now + preamb_t
         self._change_state(NodeState.TX_PREAMBLE)
         yield self.env.timeout(preamb_t)
 
         self._change_state(NodeState.TX_PAYLOAD)
         yield self.env.timeout(payload_t)
+        self._pkt_in_tx = None
 
     def _resolve_capture(self, active: list[Node]):
         """Return the node that survives interference using the capture effect, or None on a collision"""
@@ -223,7 +259,7 @@ class Node:
     def _track_spend_energy(self, to_state: NodeState):
         dt = self.env.now - self._last_change_time
         self.buffer = min(
-            self.energy.buffer.capacity,
+            self.energy.buffer,
             max(
                 0.0,
                 self.buffer

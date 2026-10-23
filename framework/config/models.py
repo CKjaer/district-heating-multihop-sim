@@ -1,4 +1,5 @@
 import math
+import warnings
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -19,6 +20,7 @@ class Radio:
     rx_sensitivity: float
     bandwidth: float
     spreading_factor: int
+    sym_limit: int
     sym_time: float = field(init=False)
     CAPTURE_THRESHOLD: ClassVar[float] = 6.0 # dB
     N_SYNC_SYM: ClassVar[int] = 4 # symbols
@@ -45,20 +47,21 @@ class UndergroundToAboveground:
 
 @dataclass
 class Packet:
+    n_preamble_sym: int = 8
     payload: bytes = bytes(1)
     crc: int = 0
     code_rate: int = 1
     implicit_header: int = 1
     data_rate_optimize: int = 0
-    n_preamble_sym: int = 8
 
 
 @dataclass
 class Mac:
     cad_interval: float
-    n_preamble_sym: int
     max_start_delay: float
     measure_interval: float
+    anycast: bool 
+    n_preamble_sym: int = field(init=False)
     cad_det_time: float = field(init=False) 
     cad_proc_time: float = field(init=False)  
     _SYNCWORD: ClassVar[float] = 4.25 # LoRa symbols
@@ -86,43 +89,36 @@ class Mac:
         n_payload_sym = 8 + max(math.ceil((nom / denom) * (pkt.code_rate + 4)), 0)
 
         return n_payload_sym
+    
+    def calculate_bmac_preamb(self, radio: Radio):
+        n_sym = math.ceil(
+            self.cad_interval / radio.sym_time
+        )
+        if n_sym > radio.sym_limit:
+            warnings.warn(f"Required preamble length {n_sym} exceeds transceiver limit {radio.sym_limit}")
+        return n_sym
 
-
-@dataclass
-class Transceiver:
-    name: str
-    sleep_current: float
-    tx_current: float
-    rx_current: float
-    cad_process_current: float
-
-
-@dataclass
-class EnergyBuffer:
-    capacitance: float  
-    v_max: float  
-    v_min: float  
-    capacity: float = field(init=False)  
-
-    def __post_init__(self):
-        self.capacity = 0.5 * self.capacitance * (self.v_max**2 - self.v_min**2)
 
 @dataclass
 class EnergyProfile:
     vcc: float
     harvest_power: float  
-    tcvr: Transceiver
-    buffer: EnergyBuffer
+    sleep_current: float   
+    tx_current: float     
+    rx_current: float     
+    cad_process_current: float
+    buffer: float         
+
     sleep_power: float = field(init=False)
     tx_power: float = field(init=False)
     rx_power: float = field(init=False)   
     cad_process_power: float = field(init=False)
 
     def __post_init__(self):
-        self.sleep_power = self.tcvr.sleep_current * self.vcc
-        self.tx_power = self.tcvr.tx_current * self.vcc
-        self.rx_power = self.tcvr.rx_current * self.vcc
-        self.cad_process_power = self.tcvr.cad_process_current * self.vcc
+        self.sleep_power = self.sleep_current * self.vcc
+        self.tx_power = self.tx_current * self.vcc
+        self.rx_power = self.rx_current * self.vcc
+        self.cad_process_power = self.cad_process_current * self.vcc
 
 
 @dataclass
@@ -135,8 +131,12 @@ class Config:
     energy: EnergyProfile
 
     def __post_init__(self):
-        d_t, p_t = self.mac.calculate_cad_timings(
+        self.mac.cad_det_time, self.mac.cad_proc_time  = self.mac.calculate_cad_timings(
             self.radio.spreading_factor, self.radio.bandwidth
         )
-        self.mac.cad_det_time = d_t
-        self.mac.cad_proc_time = p_t
+        
+        if self.mac.anycast:
+            raise NotImplementedError
+        else:
+            self.mac.n_preamble_sym = self.mac.calculate_bmac_preamb(self.radio)
+            

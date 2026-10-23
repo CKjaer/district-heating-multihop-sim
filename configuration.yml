@@ -1,6 +1,6 @@
 network:
   burial_depth: -1.0      # m
-  num_nodes: 10
+  num_nodes: 2
   spacing: 12.0           # m
 
 radio:
@@ -8,9 +8,10 @@ radio:
   tx_power: -4.0          # dBm
   tx_gain: 0.0            # dBi
   rx_gain: 0.0            # dBi
-  rx_sensitivity: -111    # dBm, For SX1276/77/78/79 devices @500 kHz bandwidth in HF mode
+  rx_sensitivity: -111    # dBm, for SX1276 SF6/500 kHz
   bandwidth: 500.0e+3     # Hz
-  spreading_factor: 6
+  spreading_factor: 6     
+  sym_limit: 65535
 
 # Config for underground-to-underground link between nodes
 u2u:
@@ -29,21 +30,16 @@ u2g:
   path_loss_exponent: 2.0
 
 energy:
-  vcc: 3.3                # V
-  harvest_power: 0.55e-3  # W
-  tcvr:
-    name: "SX1276" # Current consumption for SF6 and BW=500 kHz
-    sleep_current: 0.2e-6 # A
-    tx_current: 20.0e-3   # A
-    rx_current: 13.8e-3   # A
-    cad_process_current: 8.3e-3 # A
-  buffer:
-    capacitance: 1.0      # F
-    v_max: 5.3            # V
-    v_min: 3.5            # V, regulator cut-off
+  vcc: 3.3                    # V
+  harvest_power: 0.55e-3      # W
+  sleep_current: 0.2e-6       # A
+  tx_current: 20.0e-3         # A
+  rx_current: 13.8e-3         # A
+  cad_process_current: 8.3e-3 # A
+  buffer: 7.92                # J, 1F supercapacitor 
 
 mac:
-  cad_interval: 2.0       # s
-  n_preamble_sym: 8       # LoRa symbols (without syncword)
-  max_start_delay: 10.0   # s
-  measure_interval: 3600  # s 
+  cad_interval: 10.0    # s
+  max_start_delay: 5.0  # s
+  measure_interval: 30  # s 
+  anycast: False        # True: Anycast, False: BMAC with cad_interval=preamble_len
