@@ -58,6 +58,7 @@ class Packet:
 @dataclass
 class Mac:
     cad_interval: float
+    cad_jitter: float
     max_start_delay: float
     measure_interval: float
     anycast: bool 
@@ -65,7 +66,7 @@ class Mac:
     n_preamble_sym: int = field(init=False)
     cad_det_time: float = field(init=False) 
     cad_proc_time: float = field(init=False)  
-    _SYNCWORD: ClassVar[float] = 4.25 # LoRa symbols
+    _SYNCWORD: ClassVar[float] = 4.25 # symbols
 
     @staticmethod
     def calculate_cad_timings(sf: int, bw: float):

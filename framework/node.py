@@ -118,7 +118,8 @@ class Node:
 
     def _periodic_wakeup(self):
         while True:            
-            yield self.env.timeout(self.mac.cad_interval)
+            jitter = self.mac.cad_interval * self.mac.cad_jitter 
+            yield self.env.timeout(self.mac.cad_interval + random.uniform(-jitter, jitter))
 
             self._change_state(NodeState.CAD_DETECT)
             yield self.env.timeout(self.mac.cad_det_time)

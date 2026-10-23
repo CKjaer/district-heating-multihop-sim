@@ -40,7 +40,9 @@ energy:
 
 mac:
   cad_interval: 10.0      # s
+  cad_jitter: .15         # fraction of cad_interval
   max_start_delay: 5.0    # s
   measure_interval: 30.0  # s 
   anycast: False          # True: Anycast, False: BMAC with cad_interval=preamble_len
   excess_path_loss: 0.0   # dB/m
+  
