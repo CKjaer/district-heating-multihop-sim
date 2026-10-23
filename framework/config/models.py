@@ -61,6 +61,7 @@ class Mac:
     max_start_delay: float
     measure_interval: float
     anycast: bool 
+    excess_path_loss: float
     n_preamble_sym: int = field(init=False)
     cad_det_time: float = field(init=False) 
     cad_proc_time: float = field(init=False)  

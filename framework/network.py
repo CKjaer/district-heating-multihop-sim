@@ -1,7 +1,9 @@
 import itertools
+from functools import cached_property
 
 import networkx as nx
 import simpy as sp
+from scipy import optimize
 
 from .config.models import Config
 from .coverage import compute_coverage_prob, find_cell_edge_margin
@@ -52,6 +54,17 @@ class LinearNetwork:
         path_loss = self._calculate_u2u_path_loss(dist)
         
         return self.config.radio.tx_power - path_loss
+    
+    @cached_property
+    def overhearing_range(self):
+        lb = self.config.radio.tx_power - self.config.radio.rx_sensitivity
+        f = lambda d: self._calculate_u2u_path_loss(d) - lb
+        
+        return optimize.brentq(f, 0.1, 1500)
+    
+    @cached_property
+    def n_overhearing_neigbors(self):
+        return int(self.overhearing_range / self.config.network.spacing)
 
     def is_node_in_range(self, node: Node, other: Node):
         return self.rss(node, other) > self.config.radio.rx_sensitivity
@@ -133,7 +146,10 @@ class LinearNetwork:
                 )
 
     def _calculate_u2u_path_loss(self, dist):
-        return self._fspl(dist) + self._insulation_attenuation(dist)
+        return self._fspl(dist) + self._insulation_attenuation(dist) + self._excess_path_loss(dist)
+
+    def _excess_path_loss(self, dist):
+        return self.config.mac.excess_path_loss * dist
 
     def _assign_coverage_prob(self, x_pos):
 
