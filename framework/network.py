@@ -33,6 +33,10 @@ class LinearNetwork:
         self._cell_margin = find_cell_edge_margin(config.u2g)
         self._max_radius = (self.config.network.num_nodes + 1) * config.network.spacing
         
+        # (src_uid, seq) of packets that already reached the gateway, so that a packet
+        # relayed to several sinks is only counted once in PDR
+        self.gateway_seen: set[tuple[int, int]] = set()
+
         self.graph = nx.Graph()
         self.nodes = [
             self._create_node(uid) for uid in range(self.config.network.num_nodes)
@@ -120,11 +124,9 @@ class LinearNetwork:
             env=self.env,
             uid=uid,
             pos=position,
-            mac=self.config.mac,
-            radio=self.config.radio,
+            cf=self.config,
             nw=self,
-            e=self.config.energy,
-            coverage=coverage,
+            cov=coverage,
         )
 
         self.graph.add_node(
@@ -159,6 +161,6 @@ class LinearNetwork:
                     self.config.u2g, self._cell_margin, self._max_radius, x_pos
                 )
             case "edge":  # Coverage probability is identical for all uid
-                return self._cell_margin
+                return self.config.u2g.cell_coverage_prob
             case _:
                 raise ValueError("Unknown coverage case:", self.config.u2g.coverage)

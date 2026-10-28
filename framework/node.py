@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import simpy as sp
 
-from .config.models import EnergyProfile, Mac, Packet, Radio
+from .config.models import Config, Packet
 from .position import Position
 
 if TYPE_CHECKING:
@@ -64,23 +64,22 @@ class Node:
         env: sp.Environment,
         uid: int,
         pos: Position,
-        mac: Mac,
-        radio: Radio,
+        cf: Config,
         nw: LinearNetwork,
-        e: EnergyProfile,
-        coverage: float,
+        cov: float,
     ):
         self.env = env
         self.uid = uid
         self.position = pos
-        self.mac = mac
-        self.radio = radio
+        self.mac = cf.mac
+        self.radio = cf.radio
         self.network = nw
-        self.coverage = coverage
-        self.energy = e
+        self.coverage = cov
+        self.energy = cf.energy
 
-        self.buffer = self.energy.buffer  
+        self.buffer = cf.energy.buffer  
         self.state = NodeState.INIT
+        self._min_cov = cf.network.min_sink_cov
         self._radio_state_changed = self.env.event()
         self._last_change_time = 0.0
         self._preamb_end = 0.0
@@ -90,13 +89,22 @@ class Node:
         self._pkt_in_tx: Packet | None = None
         self._pkt_seen = []
 
-        # Statistics
+        # Node statistics
         self.record_history = True
         self.history: list[StateChange] = []
         self.time_spent_in: defaultdict[NodeState, float] = defaultdict(float)
         self.collisions = []
-        self.received = []
+        
+        # Uplink statistics
+        self.delays: list[float] = []  
+        self.n_sent = 0  
+        self.n_delivered = 0 
+        self.n_relayed = 0
     
+    @property
+    def is_sink(self):
+        return self.coverage > self._min_cov
+
     def __str__(self):
         return f"Node {self.uid} at {self.position}"
 
@@ -138,10 +146,18 @@ class Node:
                 yield from self._rx()
             elif self.env.now >= self._next_measurement:
                 payload = PipesensePayload(src_uid=self.uid, seq=self._msg_seq, link_var=1.0)
-                pkt = Packet(n_preamble_sym=self.mac.n_preamble_sym, payload=bytes(payload))
-                yield from self._tx(pkt)
+                pkt = Packet(n_preamble_sym=self.mac.n_preamble_sym, payload=bytes(payload), created_at=self.env.now)
+                self.n_sent += 1
                 self._msg_seq += 1
-                self._next_measurement = self.env.now + self.mac.measure_interval
+                self._pkt_seen.append((payload.src_uid, payload.seq))  # Never relay own packet back
+                
+                if self.is_sink: # Direct uplink 
+                    # TODO: Change uplink format and add correct timing
+                    self._tx_gateway(pkt)
+                else: # No viable uplink, forward to neighboring nodes
+                    yield from self._tx(pkt)
+                    self.n_relayed += 1
+                self._next_measurement = self.env.now + self.mac.measure_interval     
 
             self._change_state(NodeState.SLEEP)
 
@@ -160,7 +176,7 @@ class Node:
             
             # Locked sender finished its frame without being disrupted
             if locked is not None and locked not in active:
-                if self.handle_rx(locked, locked_pkt):
+                if self.handle_rx(locked_pkt):
                     return locked
                 return None
 
@@ -189,8 +205,7 @@ class Node:
 
             yield self.env.any_of([n._radio_state_changed for n in neighbors])
 
-    def handle_rx(self, sender: Node, pkt: Packet | None) -> bool:
-        """Accept a captured frame unless its payload id was seen before."""
+    def handle_rx(self, pkt: Packet | None) -> bool:
         if pkt is None:
             return False
         
@@ -199,7 +214,7 @@ class Node:
             return False
 
         self._pkt_seen.append((payload.src_uid, payload.seq))
-        self.received.append((self.env.now, sender.uid))
+
         return True
 
     def _tx(self, pkt: Packet):
@@ -214,6 +229,19 @@ class Node:
         self._change_state(NodeState.TX_PAYLOAD)
         yield self.env.timeout(payload_t)
         self._pkt_in_tx = None
+
+    def _tx_gateway(self, pkt: Packet):
+        """Uplink a packet (own or relayed) to the gateway with the coverage probability."""
+        payload = PipesensePayload.from_bytes(pkt.payload)
+        msg_id = (payload.src_uid, payload.seq)
+        if msg_id in self.network.gateway_seen:  # Already delivered via another sink
+            return
+
+        if self.coverage > random.random():
+            self.network.gateway_seen.add(msg_id)
+            src = self.network.nodes[payload.src_uid]
+            src.delays.append(self.env.now - pkt.created_at)
+            src.n_delivered += 1
 
     def _resolve_capture(self, active: list[Node]):
         """Return the node that survives interference using the capture effect, or None on a collision"""

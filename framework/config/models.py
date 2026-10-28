@@ -5,10 +5,11 @@ from typing import ClassVar
 
 
 @dataclass
-class NetworkGeometry:
+class Network:
     burial_depth: float
     num_nodes: int
     spacing: float
+    min_sink_cov: float  
 
 
 @dataclass
@@ -47,13 +48,14 @@ class UndergroundToAboveground:
 
 @dataclass
 class Packet:
+    created_at: float  
     n_preamble_sym: int = 8
     payload: bytes = bytes(1)
     crc: int = 0
     code_rate: int = 1
     implicit_header: int = 1
     data_rate_optimize: int = 0
-
+    
 
 @dataclass
 class Mac:
@@ -125,7 +127,7 @@ class EnergyProfile:
 
 @dataclass
 class Config:
-    network: NetworkGeometry
+    network: Network
     u2u: UndergroundToUnderground
     u2g: UndergroundToAboveground
     mac: Mac
